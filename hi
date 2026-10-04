@@ -1,0 +1,185 @@
+-- Services
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- Clean up existing GUI and old loop if re-executed
+if CoreGui:FindFirstChild("SpeedGUI") then
+    CoreGui.SpeedGUI:Destroy()
+end
+
+if getgenv().OldSpeedConnection then
+    getgenv().OldSpeedConnection:Disconnect()
+    getgenv().OldSpeedConnection = nil
+end
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SpeedGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Parent safely to CoreGui or PlayerGui
+local success = pcall(function()
+    screenGui.Parent = CoreGui
+end)
+if not success then
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+end
+
+-- Main Frame (The GUI Window)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 220, 0, 130)
+mainFrame.Position = UDim2.new(0.5, -110, 0.4, -65)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 6)
+uiCorner.Parent = mainFrame
+
+-- Top Bar (Draggable Area)
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+local topCorner = Instance.new("UICorner")
+topCorner.CornerRadius = UDim.new(0, 6)
+topCorner.Parent = topBar
+
+-- Fix bottom corners of topbar square
+local topFix = Instance.new("Frame")
+topFix.Size = UDim2.new(1, 0, 0, 5)
+topFix.Position = UDim2.new(0, 0, 1, -5)
+topFix.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+topFix.BorderSizePixel = 0
+topFix.Parent = topBar
+
+-- Title Label
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -10, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "WalkSpeed GUI"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = topBar
+
+-- TextBox for Speed Input
+local speedBox = Instance.new("TextBox")
+speedBox.Name = "SpeedBox"
+speedBox.Size = UDim2.new(1, -20, 0, 35)
+speedBox.Position = UDim2.new(0, 10, 0, 42)
+speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+speedBox.BorderSizePixel = 0
+speedBox.PlaceholderText = "Enter WS (e.g. 100)"
+speedBox.Text = ""
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+speedBox.TextSize = 14
+speedBox.Font = Enum.Font.SourceSans
+speedBox.ClearTextOnFocus = false
+speedBox.Parent = mainFrame
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 4)
+boxCorner.Parent = speedBox
+
+-- Reset Button (Default WS = 16)
+local resetButton = Instance.new("TextButton")
+resetButton.Name = "ResetButton"
+resetButton.Size = UDim2.new(1, -20, 0, 28)
+resetButton.Position = UDim2.new(0, 10, 0, 85)
+resetButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+resetButton.BorderSizePixel = 0
+resetButton.Text = "Reset Speed (16)"
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.TextSize = 13
+resetButton.Font = Enum.Font.SourceSansBold
+resetButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 4)
+btnCorner.Parent = resetButton
+
+-- Core Speed Modification Logic
+local currentSpeed = 16
+local speedEnabled = false
+
+speedBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local num = tonumber(speedBox.Text)
+        if num then
+            currentSpeed = num
+            speedEnabled = true
+        else
+            if speedBox.Text == "" then
+                speedEnabled = false
+            end
+        end
+    end
+end)
+
+resetButton.MouseButton1Click:Connect(function()
+    currentSpeed = 16
+    speedBox.Text = "16"
+    speedEnabled = true
+end)
+
+-- Continuous check stored globally so re-executing terminates it
+getgenv().OldSpeedConnection = RunService.Stepped:Connect(function()
+    if speedEnabled then
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = currentSpeed
+            end
+        end
+    end
+end)
+
+-- Make GUI Moveable (Draggable functionality)
+local dragging, dragInput, dragStart, startPos
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+topBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
